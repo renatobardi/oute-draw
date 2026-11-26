@@ -23,6 +23,8 @@ interface Link {
   makingOffer: boolean;
   ignoreOffer: boolean;
   audio: HTMLAudioElement;
+  /** Signalling for one peer is handled strictly in arrival order. */
+  queue: Promise<void>;
 }
 
 type Signal =
@@ -131,37 +133,41 @@ export class Call {
       const known = this.state.peers.get(from);
       this.state.peers.set(from, { muted: !!msg.muted, screen: known?.screen ?? null });
       this.emit();
-      if (this.state.inCall && !this.links.has(from)) {
+      // Both sides learn about each other; the lower id opens the connection, so two
+      // offers rarely cross. The other side answers when the offer arrives.
+      if (this.state.inCall && !this.links.has(from) && (this.collab()?.selfId ?? "") < from) {
         this.link(from);
-        // They may have announced before we joined: make sure they know about us.
-        if (!known) this.announce(from);
       }
+      // They may have announced before we joined: make sure they know about us.
+      if (this.state.inCall && !known) this.announce(from);
       return;
     }
     if (!this.state.inCall) return;
     const link = this.links.get(from) ?? this.link(from);
+    // A candidate must never overtake the description it belongs to.
+    link.queue = link.queue.then(() => this.signal(from, link, msg)).catch((e) => console.warn("call signalling failed", e));
+  }
+
+  private async signal(from: string, link: Link, msg: Extract<Signal, { t: "rtc" }>) {
     const { pc } = link;
-    try {
-      if (msg.desc) {
-        // Perfect negotiation: on a collision the polite side yields its own offer.
-        const polite = (this.collab()?.selfId ?? "") < from;
-        const collision = msg.desc.type === "offer" && (link.makingOffer || pc.signalingState !== "stable");
-        link.ignoreOffer = !polite && collision;
-        if (link.ignoreOffer) return;
-        await pc.setRemoteDescription(msg.desc);
-        if (msg.desc.type === "offer") {
-          await pc.setLocalDescription();
-          this.collab()?.send({ t: "rtc", to: from, desc: pc.localDescription });
-        }
-      } else if (msg.cand) {
-        try {
-          await pc.addIceCandidate(msg.cand);
-        } catch (e) {
-          if (!link.ignoreOffer) throw e;
-        }
+    if (pc.signalingState === "closed") return;
+    if (msg.desc) {
+      // Perfect negotiation: on a collision the polite side yields its own offer.
+      const polite = (this.collab()?.selfId ?? "") < from;
+      const collision = msg.desc.type === "offer" && (link.makingOffer || pc.signalingState !== "stable");
+      link.ignoreOffer = !polite && collision;
+      if (link.ignoreOffer) return;
+      await pc.setRemoteDescription(msg.desc);
+      if (msg.desc.type === "offer") {
+        await pc.setLocalDescription();
+        this.collab()?.send({ t: "rtc", to: from, desc: pc.localDescription });
       }
-    } catch (e) {
-      console.warn("call signalling failed", e);
+    } else if (msg.cand) {
+      try {
+        await pc.addIceCandidate(msg.cand);
+      } catch (e) {
+        if (!link.ignoreOffer) throw e;
+      }
     }
   }
 
@@ -169,7 +175,7 @@ export class Call {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     const audio = new Audio();
     audio.autoplay = true;
-    const link: Link = { pc, makingOffer: false, ignoreOffer: false, audio };
+    const link: Link = { pc, makingOffer: false, ignoreOffer: false, audio, queue: Promise.resolve() };
     this.links.set(id, link);
 
     pc.onnegotiationneeded = async () => {

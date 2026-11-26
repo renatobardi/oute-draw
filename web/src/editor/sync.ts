@@ -46,6 +46,8 @@ export class SceneSync {
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
   private relayTimer: ReturnType<typeof setTimeout> | undefined;
   private saving = false;
+  /** The last save failed; the indicator keeps saying so until one succeeds. */
+  private failed = false;
   private lastThumbnail = 0;
   private disposed = false;
 
@@ -82,9 +84,9 @@ export class SceneSync {
       }, BROADCAST_DELAY);
     }
     if (this.isDirty()) {
-      if (!this.saving) this.onState("dirty");
+      if (!this.saving && !this.failed) this.onState("dirty");
       clearTimeout(this.saveTimer);
-      this.saveTimer = setTimeout(() => void this.save(), SAVE_DELAY);
+      this.saveTimer = setTimeout(() => void this.save(), this.failed ? 5000 : SAVE_DELAY);
     }
   }
 
@@ -211,7 +213,7 @@ export class SceneSync {
     }
     if (!this.isDirty() && !opts.forceThumbnail) return;
     this.saving = true;
-    this.onState("saving");
+    if (!this.failed) this.onState("saving");
     const batch = this.elements.filter((el) => this.saved.get(el.id) !== el.version);
     const appStateJSON = this.appState ? JSON.stringify(pickAppState(this.appState)) : this.savedAppState;
     try {
@@ -232,6 +234,7 @@ export class SceneSync {
       for (const el of batch) this.saved.set(el.id, el.version);
       this.savedAppState = appStateJSON;
       this.saving = false;
+      this.failed = false;
       if (this.isDirty()) {
         this.onState("dirty");
         this.saveTimer = setTimeout(() => void this.save(), SAVE_DELAY);
@@ -240,6 +243,7 @@ export class SceneSync {
       }
     } catch {
       this.saving = false;
+      this.failed = true;
       this.onState("error");
       if (!this.disposed) this.saveTimer = setTimeout(() => void this.save(), 5000);
     }

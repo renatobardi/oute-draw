@@ -538,6 +538,10 @@ textarea {
   flex: none;
 }
 
+.editor-bar > :not(.grow) {
+  flex: none;
+}
+
 .title-input {
   border-color: transparent;
   background: transparent;

@@ -11,10 +11,10 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -126,8 +126,11 @@ func notFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
-	// A malformed uuid in a URL is a miss, not a server error.
-	if err != nil && strings.Contains(err.Error(), "22P02") {
+	// A malformed uuid in a URL, or a reference to a row that is not there (a file
+	// for an unknown scene, a scene in an unknown collection), is a miss, not a
+	// server error.
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) && (pg.Code == "22P02" || pg.Code == "23503") {
 		return ErrNotFound
 	}
 	return err

@@ -269,6 +269,7 @@ func TestFilesAndThumbnail(t *testing.T) {
 	e.want(e.do("PUT", "/api/scenes/"+id+"/files/abc123", admin, png, "Content-Type", "image/png"), 204)
 	e.want(e.do("PUT", "/api/scenes/"+id+"/files/evil", admin, []byte("<html>"), "Content-Type", "text/html"), 400)
 	e.want(e.do("PUT", "/api/scenes/"+id+"/files/bad..id", admin, png, "Content-Type", "image/png"), 400)
+	e.want(e.do("PUT", "/api/scenes/00000000-0000-4000-8000-000000000000/files/abc", admin, png, "Content-Type", "image/png"), 404)
 	got := e.want(e.do("GET", "/api/scenes/"+id+"/files/abc123", admin, nil), 200)
 	if !bytes.Equal(got.body, png) {
 		t.Fatal("file did not round-trip")

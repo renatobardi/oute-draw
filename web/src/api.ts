@@ -109,7 +109,9 @@ export async function request<T>(
   body?: unknown,
   init: { headers?: Record<string, string>; keepalive?: boolean; raw?: BodyInit } = {},
 ): Promise<T> {
-  const headers: Record<string, string> = { ...init.headers };
+  // Asking for JSON makes the login proxy answer 401 instead of redirecting a
+  // background request to the identity provider.
+  const headers: Record<string, string> = { Accept: "application/json", ...init.headers };
   let payload: BodyInit | undefined = init.raw;
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";

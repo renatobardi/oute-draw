@@ -1,0 +1,58 @@
+# Deploy do draw-prd no oute-server, no mesmo desenho do backstage-prd
+# (oute-infra-ops ADR-0010, ADR-0011). Sem IP, porta, email ou segredo aqui: tudo vem
+# do /opt/app/.env e do /opt/app/emails.txt. Uso, de /opt/app no LXC:
+#   docker compose -f deploy/compose.yaml --env-file .env up -d
+#
+# Rede: só o oauth2-proxy é publicado. O app confia no X-Forwarded-Email, então nada
+# além do proxy pode alcançá-lo: ele não publica porta, e o nginx do host limpa os
+# headers de identidade que um cliente mandar (vhosts_behaviour, oute-infra-ops).
+name: draw
+
+services:
+  draw:
+    image: ghcr.io/renatobardi/oute-draw:${DRAW_TAG:-latest}
+    env_file: ../.env
+    environment:
+      DRAW_AUTH_MODE: proxy
+      # O compose recusa subir sem estes, em vez de subir quebrado.
+      DRAW_DATABASE_URL: ${DRAW_DATABASE_URL:?defina no .env}
+      DRAW_SECRET: ${DRAW_SECRET:?defina no .env (openssl rand -hex 32)}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/oute-draw", "-healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:${OAUTH2_PROXY_TAG:-v7.15.4}
+    # Do .env: OAUTH2_PROXY_CLIENT_ID, OAUTH2_PROXY_CLIENT_SECRET, OAUTH2_PROXY_COOKIE_SECRET.
+    env_file: ../.env
+    environment:
+      OAUTH2_PROXY_PROVIDER: google
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_UPSTREAMS: http://draw:8080
+      OAUTH2_PROXY_REDIRECT_URL: ${DRAW_PUBLIC_URL:?defina no .env}/oauth2/callback
+      # Quem entra: a lista de emails. O que cada um faz depois: papéis dentro do app.
+      OAUTH2_PROXY_AUTHENTICATED_EMAILS_FILE: /etc/oauth2-proxy/emails.txt
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_COOKIE_NAME: _oute_draw
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      # X-Forwarded-Email para o app. Nas rotas sem login abaixo o proxy remove esses
+      # headers do pedido do cliente (skip_auth_strip_headers, ligado por padrão).
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+      # As rotas sem login são as dos links de compartilhamento: a página /s/<token>,
+      # a API pública que só responde a um token válido, e os arquivos estáticos do
+      # app. Nada do workspace ($$ é o $ literal da regex: o compose interpola $).
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: "GET=^/s/[A-Za-z0-9_-]+$$,^/api/public/s/,GET=^/assets/,GET=^/fonts/,GET=^/favicon\\.svg$$"
+    volumes:
+      - ../emails.txt:/etc/oauth2-proxy/emails.txt:ro
+    ports:
+      - ${DRAW_PUBLICAR:?defina no .env}:4180
+    depends_on:
+      draw:
+        condition: service_healthy
+    restart: unless-stopped
