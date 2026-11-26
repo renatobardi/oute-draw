@@ -209,6 +209,7 @@ func (s *Server) handleGetScene(w http.ResponseWriter, r *http.Request, sceneID 
 			"canEdit": a.CanEdit && sc.DeletedAt == nil, "canComment": a.CanComment,
 			"guest": a.Guest, "name": a.Name,
 		},
+		"iceServers": s.cfg.ICEServers,
 	})
 }
 

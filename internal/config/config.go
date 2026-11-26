@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -27,6 +28,9 @@ type Config struct {
 
 	AnthropicAPIKey string
 	AIModel         string
+
+	// ICEServers is handed to browsers for voice calls, as WebRTC RTCIceServer JSON.
+	ICEServers json.RawMessage
 }
 
 func env(key, def string) string {
@@ -50,6 +54,7 @@ func Load() (Config, error) {
 		AnthropicAPIKey: env("ANTHROPIC_API_KEY", ""),
 		AIModel:         env("DRAW_AI_MODEL", "claude-opus-5-5"),
 		AdminEmails:     map[string]bool{},
+		ICEServers:      json.RawMessage(env("DRAW_ICE_SERVERS", `[{"urls":"stun:stun.l.google.com:19302"}]`)),
 	}
 	for _, e := range strings.Split(env("DRAW_ADMIN_EMAILS", ""), ",") {
 		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
@@ -71,6 +76,10 @@ func Load() (Config, error) {
 		}
 	default:
 		errs = append(errs, fmt.Errorf("DRAW_AUTH_MODE must be proxy or dev, got %q", c.AuthMode))
+	}
+	var ice []map[string]any
+	if err := json.Unmarshal(c.ICEServers, &ice); err != nil {
+		errs = append(errs, fmt.Errorf("DRAW_ICE_SERVERS must be a JSON array of ICE servers: %w", err))
 	}
 	switch c.DefaultRole {
 	case "editor", "viewer":

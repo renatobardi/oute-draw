@@ -8,3 +8,4 @@ node_modules/
 *.local
 test-results/
 playwright-report/
+web/public/fonts/

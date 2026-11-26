@@ -76,7 +76,8 @@ func setup(t *testing.T) *env {
 	cfg := config.Config{
 		AuthMode: "proxy", EmailHeader: "X-Forwarded-Email", NameHeader: "X-Forwarded-Preferred-Username",
 		DefaultRole: "editor", AdminEmails: map[string]bool{"admin@oute.pro": true},
-		Secret: []byte("test-secret-test-secret-test-secret"),
+		Secret:     []byte("test-secret-test-secret-test-secret"),
+		ICEServers: json.RawMessage(`[]`),
 	}
 	web := fstest.MapFS{
 		"index.html":    {Data: []byte("<html>app</html>")},
