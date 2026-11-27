@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: oute-draw
+  description: Quadro branco do oute — desenhos, colaboração ao vivo, links, histórico, comentários e apresentações
+  annotations:
+    github.com/project-slug: renatobardi/oute-draw
+    backstage.io/techdocs-ref: dir:.
+  tags: [oute, go]
+spec:
+  type: website
+  owner: group:default/oute
+  lifecycle: production

@@ -1,0 +1,11 @@
+# built web app: only the placeholder is tracked, so `go build` works on a fresh clone
+web/dist/*
+!web/dist/.gitkeep
+node_modules/
+/oute-draw
+/bin/
+.env
+*.local
+test-results/
+playwright-report/
+web/public/fonts/

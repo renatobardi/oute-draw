@@ -1,0 +1,26 @@
+{
+  "name": "oute-draw-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run fonts && vite",
+    "build": "npm run fonts && tsc --noEmit && vite build && touch dist/.gitkeep",
+    "check": "tsc --noEmit",
+    "fonts": "rm -rf public/fonts && cp -r node_modules/@excalidraw/excalidraw/dist/prod/fonts public/fonts"
+  },
+  "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
+    "jspdf": "^4.2.1",
+    "pptxgenjs": "^4.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.32",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.4.0"
+  }
+}
